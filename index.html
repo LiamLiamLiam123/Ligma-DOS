@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Ligma-Dos</title>
+  <script src="https://js-dos.com/6.22/current/js-dos.js"></script>
+
+  <style>
+    body {
+      background: black;
+      color: #00ff00;
+      font-family: monospace;
+      margin: 0;
+    }
+
+    #header {
+      background: #001100;
+      padding: 10px;
+      border-bottom: 2px solid #00ff00;
+      text-align: center;
+    }
+
+    #dos {
+      width: 100vw;
+      height: calc(100vh - 50px);
+    }
+  </style>
+</head>
+
+<body>
+
+<div id="header">
+  🖥️ Ligma-Dos — MS-DOS Mode
+</div>
+
+<div id="dos"></div>
+
+<script>
+  const ci = Dos(document.getElementById("dos"), {
+    url: "https://js-dos.com/cdn/upload/free-dos-7.1.jsdos",
+    autoStart: true
+  });
+
+  // Optional: you can send commands automatically after boot
+  ci.then((dos) => {
+    // Wait a bit for DOS to boot
+    setTimeout(() => {
+      dos.run("dir");   // shows files
+    }, 3000);
+  });
+</script>
+
+</body>
+</html>
