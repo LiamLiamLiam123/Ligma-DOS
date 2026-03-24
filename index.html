@@ -12,7 +12,6 @@
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* Official js-dos requirement: html + body full height */
 html, body {
   width: 100%;
   height: 100%;
@@ -20,19 +19,16 @@ html, body {
   overflow: hidden;
 }
 
-/* #dos exactly as the official docs show */
 #dos {
   width: 100%;
   height: 100%;
 }
 
-/* ── CRT overlay — completely separate from #dos, pointer-events:none ── */
 #crt {
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 9999;
-  /* scanlines */
   background: repeating-linear-gradient(
     0deg,
     transparent 0px, transparent 2px,
@@ -43,11 +39,9 @@ html, body {
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse at 50% 50%,
-    transparent 55%, rgba(0,0,0,0.45) 100%);
+  background: radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(0,0,0,0.45) 100%);
 }
 
-/* ── Boot screen overlay ── */
 #boot {
   position: fixed;
   inset: 0;
@@ -63,7 +57,6 @@ html, body {
 }
 #boot.gone { display: none; }
 
-/* ── Error screen ── */
 #err {
   display: none;
   position: fixed;
@@ -83,7 +76,6 @@ html, body {
 }
 #err.show { display: flex; }
 
-/* CRT power-on flicker */
 @keyframes crt-on {
   0%   { opacity: 0 }
   5%   { opacity: 1; filter: brightness(5) }
@@ -97,13 +89,9 @@ body { animation: crt-on 0.9s ease-out both; }
 </head>
 <body>
 
-<!-- CRT effect — totally separate from DOSBox div -->
 <div id="crt"></div>
-
-<!-- Boot animation shown while WASM loads -->
 <div id="boot"><div id="blog"></div></div>
 
-<!-- Error overlay -->
 <div id="err">
   <div style="font-size:1.5em;color:#ff5555">&#9888; SYSTEM ERROR</div>
   <div id="errmsg" style="max-width:480px"></div>
@@ -114,10 +102,6 @@ body { animation: crt-on 0.9s ease-out both; }
   </div>
 </div>
 
-<!--
-  The official js-dos div — width/height set inline exactly as docs specify.
-  We do NOT apply any extra CSS to this div's children.
--->
 <div id="dos" style="width:100%;height:100%"></div>
 
 <script>
@@ -133,43 +117,39 @@ async function animateBoot() {
   };
 
   const lines = [
-    ['',                                                                null,      0  ],
-    ['Ligma-DOS BIOS v6.9  Copyright (C) Ligma Corp. 1985-1994',       '#aaffaa', 60 ],
-    ['',                                                                null,      20 ],
-    ['CPU  : Intel 80486DX2 @ 66 MHz',                                 '#33ff33', 100],
-    ['RAM  : Testing 640K Base Memory ... OK',                          '#33ff33', 260],
-    ['RAM  : Testing 15360K Extended Memory ... OK',                    '#33ff33', 440],
-    ['',                                                                null,      40 ],
-    ['HIMEM is testing extended memory...',                             '#1c991c', 180],
-    ['HIMEM is testing extended memory...done.',                        '#1c991c', 360],
-    ['',                                                                null,      30 ],
-    ['DEVICEHIGH=C:\\DOS\\LIGMA.SYS',                                   '#1c991c', 110],
-    ['DEVICEHIGH=C:\\DOS\\ANSI.SYS',                                    '#1c991c', 80 ],
-    ['',                                                                null,      40 ],
-    ['Starting Ligma-DOS...',                                           '#ffff55', 260],
-    ['',                                                                null,      70 ],
-    ['Ligma-DOS  Version 6.9',                                          '#aaffaa', 110],
-    ['Copyright (C) Ligma Corp. 1985-1994. All rights reserved.',       '#aaffaa', 80 ],
-    ['',                                                                null,      30 ],
-    ['SET PATH=C:\\DOS;C:\\GAMES',                                       '#1c991c', 60 ],
-    ['SET PROMPT=$P$G',                                                 '#1c991c', 60 ],
-    ['',                                                                null,      160],
+    ['',                                                               null,      0  ],
+    ['Ligma-DOS BIOS v6.9  Copyright (C) Ligma Corp. 1985-1994',      '#aaffaa', 60 ],
+    ['',                                                               null,      20 ],
+    ['CPU  : Intel 80486DX2 @ 66 MHz',                                '#33ff33', 100],
+    ['RAM  : Testing 640K Base Memory ... OK',                         '#33ff33', 260],
+    ['RAM  : Testing 15360K Extended Memory ... OK',                   '#33ff33', 440],
+    ['',                                                               null,      40 ],
+    ['HIMEM is testing extended memory...',                            '#1c991c', 180],
+    ['HIMEM is testing extended memory...done.',                       '#1c991c', 360],
+    ['',                                                               null,      30 ],
+    ['DEVICEHIGH=C:\\DOS\\LIGMA.SYS',                                  '#1c991c', 110],
+    ['DEVICEHIGH=C:\\DOS\\ANSI.SYS',                                   '#1c991c', 80 ],
+    ['',                                                               null,      40 ],
+    ['Starting Ligma-DOS...',                                          '#ffff55', 260],
+    ['',                                                               null,      70 ],
+    ['Ligma-DOS  Version 6.9',                                         '#aaffaa', 110],
+    ['Copyright (C) Ligma Corp. 1985-1994. All rights reserved.',      '#aaffaa', 80 ],
+    ['',                                                               null,      30 ],
+    ['SET PATH=C:\\DOS;C:\\GAMES',                                      '#1c991c', 60 ],
+    ['SET PROMPT=$P$G',                                                '#1c991c', 60 ],
+    ['',                                                               null,      160],
   ];
 
-  for (const [t, c, d] of lines) {
-    await sleep(d);
-    ln(t, c);
-  }
+  for (const [t, c, d] of lines) { await sleep(d); ln(t, c); }
 }
 
 async function buildBundle() {
   const zip = new JSZip();
 
-  // Minimal dosbox.conf — boots to C:\ prompt
   const conf = [
     '[sdl]',
     'fullscreen=false',
-    'output=surface',
+    'output=opengl',   // <-- opengl not surface; surface = black screen in WASM
     'autolock=false',
     '',
     '[dosbox]',
@@ -225,16 +205,13 @@ async function buildBundle() {
 }
 
 async function main() {
-  // Run boot animation + bundle build in parallel
   const [, bundle] = await Promise.all([animateBoot(), buildBundle()]);
 
-  // Hide boot screen
   document.getElementById('boot').classList.add('gone');
 
   const url = URL.createObjectURL(bundle);
 
   try {
-    // Use EXACT pattern from official docs — no extra options that might break rendering
     Dos(document.getElementById('dos'), { url });
     setTimeout(() => URL.revokeObjectURL(url), 30000);
   } catch(e) {
