@@ -7,417 +7,239 @@
 
 <link rel="stylesheet" href="https://v8.js-dos.com/latest/js-dos.css">
 <script src="https://v8.js-dos.com/latest/js-dos.js"></script>
-<!-- JSZip to build the .jsdos bundle in-browser -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* Official js-dos requirement: html + body full height */
 html, body {
-  width: 100%; height: 100%;
-  background: #0a0a0a;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-family: monospace;
-  overflow: hidden;
-}
-
-/* ── Monitor shell ─────────────────────────────────────────────────────────── */
-.monitor-shell {
-  /* Shrink to fit viewport — never overflow */
-  max-width: min(960px, 99vw);
-  width: 100%;
-  background: #1e1e1e;
-  border-radius: 22px 22px 16px 16px;
-  padding: 16px 16px 36px;
-  box-shadow:
-    0 0 0 3px #111,
-    0 0 0 6px #252525,
-    0 40px 100px rgba(0,0,0,0.97),
-    inset 0 1px 0 rgba(255,255,255,0.04);
-  /* Prevent the shell itself from being taller than the viewport */
-  box-sizing: border-box;
-}
-
-.monitor-brand {
-  font-family: sans-serif;
-  font-size: 10px;
-  letter-spacing: 5px;
-  color: #333;
-  text-align: center;
-  margin-bottom: 8px;
-  text-transform: uppercase;
-  flex-shrink: 0;
-}
-
-/* ── Screen bezel ──────────────────────────────────────────────────────────── */
-.screen-bezel {
-  background: #050505;
-  border-radius: 10px;
-  padding: 3px;
-  box-shadow:
-    inset 0 0 0 1px #000,
-    inset 0 0 40px rgba(0,0,0,0.8),
-    0 0 30px rgba(51,255,51,0.03);
-  position: relative;
-  overflow: hidden;
-  /* bezel height = viewport minus brand (26px) + base (52px) + shell padding (52px) + outer margin */
-  height: calc(100vh - 160px);
-  max-height: calc((min(960px, 99vw) - 32px) * 3 / 4 + 6px);
-}
-
-/* CRT vignette */
-.screen-bezel::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(ellipse at 50% 50%, transparent 50%, rgba(0,0,0,0.65) 100%);
-  z-index: 100;
-  pointer-events: none;
-  border-radius: 8px;
-}
-
-/* Scanlines */
-.screen-bezel::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent, transparent 2px,
-    rgba(0,0,0,0.12) 2px, rgba(0,0,0,0.12) 4px
-  );
-  z-index: 101;
-  pointer-events: none;
-}
-
-/* ── DOSBox mount ──────────────────────────────────────────────────────────── */
-#dos-root {
   width: 100%;
   height: 100%;
   background: #000;
-  border-radius: 7px;
   overflow: hidden;
-  position: relative;
 }
 
-/* Force js-dos canvas to fill our container fully */
-#dos-root > div { width: 100% !important; height: 100% !important; }
-#dos-root canvas { width: 100% !important; height: 100% !important; object-fit: contain; }
+/* #dos exactly as the official docs show */
+#dos {
+  width: 100%;
+  height: 100%;
+}
 
-/* ── Loading screen (shown before DOS boots) ───────────────────────────────── */
-#boot-screen {
+/* ── CRT overlay — completely separate from #dos, pointer-events:none ── */
+#crt {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  /* scanlines */
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0px, transparent 2px,
+    rgba(0,0,0,0.07) 2px, rgba(0,0,0,0.07) 4px
+  );
+}
+#crt::after {
+  content: '';
   position: absolute;
   inset: 0;
+  background: radial-gradient(ellipse at 50% 50%,
+    transparent 55%, rgba(0,0,0,0.45) 100%);
+}
+
+/* ── Boot screen overlay ── */
+#boot {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
   background: #000;
-  z-index: 50;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-  padding: 28px 32px;
   color: #33ff33;
   font-family: 'Courier New', monospace;
-  font-size: 15px;
-  line-height: 1.5;
-  text-shadow: 0 0 6px rgba(51,255,51,0.5);
+  font-size: clamp(10px, 1.4vw, 14px);
+  line-height: 1.65;
+  padding: clamp(14px, 3vw, 40px) clamp(18px, 4vw, 56px);
+  text-shadow: 0 0 5px rgba(51,255,51,0.4);
   overflow: hidden;
 }
+#boot.gone { display: none; }
 
-#boot-screen.hidden { display: none; }
-
-/* ── Monitor base ──────────────────────────────────────────────────────────── */
-.monitor-base {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 18px;
-  margin-top: 18px;
-}
-.knob {
-  width: 12px; height: 12px; border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #666, #1a1a1a);
-  box-shadow: 0 2px 5px rgba(0,0,0,0.9);
-  cursor: pointer;
-}
-.power-led {
-  width: 8px; height: 8px; border-radius: 50%;
-  background: #33ff33;
-  box-shadow: 0 0 8px #33ff33, 0 0 18px rgba(51,255,51,0.35);
-  animation: breathe 3s ease-in-out infinite;
-}
-@keyframes breathe { 0%,100%{opacity:.6} 50%{opacity:1} }
-
-/* CRT flicker on boot */
-@keyframes crt-on {
-  0%   { opacity: 0; filter: brightness(0); }
-  5%   { opacity: 1; filter: brightness(3); }
-  8%   { opacity: 0.3; filter: brightness(0.5); }
-  12%  { opacity: 1; filter: brightness(1.5); }
-  16%  { opacity: 0.7; filter: brightness(0.8); }
-  20%  { opacity: 1; filter: brightness(1); }
-  100% { opacity: 1; filter: brightness(1); }
-}
-.screen-bezel { animation: crt-on 0.8s ease-out forwards; }
-
-/* ── Error overlay ─────────────────────────────────────────────────────────── */
-#error-screen {
+/* ── Error screen ── */
+#err {
   display: none;
-  position: absolute;
+  position: fixed;
   inset: 0;
-  background: #000080;
-  z-index: 200;
+  z-index: 2000;
+  background: #000090;
+  color: #fff;
+  font-family: 'Courier New', monospace;
+  font-size: clamp(10px, 1.3vw, 14px);
+  padding: 40px;
+  text-align: center;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  font-family: 'Courier New', monospace;
-  font-size: 14px;
-  padding: 40px;
-  text-align: center;
-  line-height: 1.8;
+  gap: 12px;
+  line-height: 1.9;
 }
-#error-screen.show { display: flex; }
+#err.show { display: flex; }
+
+/* CRT power-on flicker */
+@keyframes crt-on {
+  0%   { opacity: 0 }
+  5%   { opacity: 1; filter: brightness(5) }
+  8%   { opacity: 0.1 }
+  13%  { opacity: 1; filter: brightness(1.8) }
+  18%  { opacity: 0.5 }
+  24%  { opacity: 1; filter: brightness(1) }
+}
+body { animation: crt-on 0.9s ease-out both; }
 </style>
 </head>
 <body>
 
-<div class="monitor-shell">
-  <div class="monitor-brand">Ligma-DOS &nbsp;·&nbsp; Model VGA-69 &nbsp;·&nbsp; 640K RAM</div>
+<!-- CRT effect — totally separate from DOSBox div -->
+<div id="crt"></div>
 
-  <div class="screen-bezel">
-    <div id="dos-root">
+<!-- Boot animation shown while WASM loads -->
+<div id="boot"><div id="blog"></div></div>
 
-      <!-- Fake BIOS / boot text shown while DOSBox loads -->
-      <div id="boot-screen">
-        <div id="boot-log"></div>
-      </div>
-
-      <!-- Error screen (shown if DOSBox fails) -->
-      <div id="error-screen" id="err">
-        <div style="font-size:22px;margin-bottom:16px;color:#ff4444">⚠ SYSTEM ERROR</div>
-        <div id="err-msg"></div>
-        <div style="margin-top:20px;font-size:12px;color:#aaa">
-          This page must be served over HTTP — not opened as a local file.<br>
-          Try: &nbsp;<span style="color:#ffff55">python3 -m http.server 8080</span><br>
-          Then open: &nbsp;<span style="color:#55ff55">http://localhost:8080/ligma-dos.html</span>
-        </div>
-      </div>
-
-    </div>
-  </div>
-
-  <div class="monitor-base">
-    <div class="knob"></div>
-    <div class="knob"></div>
-    <div class="power-led"></div>
-    <div class="knob"></div>
-    <div class="knob"></div>
+<!-- Error overlay -->
+<div id="err">
+  <div style="font-size:1.5em;color:#ff5555">&#9888; SYSTEM ERROR</div>
+  <div id="errmsg" style="max-width:480px"></div>
+  <div style="color:#aaa;font-size:0.85em;max-width:500px">
+    Ligma-DOS requires an HTTP server — file:// will not work.<br>
+    Run: <span style="color:#ffff55">python3 -m http.server 8080</span><br>
+    Open: <span style="color:#55ff55">http://localhost:8080/ligma-dos.html</span>
   </div>
 </div>
 
+<!--
+  The official js-dos div — width/height set inline exactly as docs specify.
+  We do NOT apply any extra CSS to this div's children.
+-->
+<div id="dos" style="width:100%;height:100%"></div>
+
 <script>
-// ── Boot log animation ────────────────────────────────────────────────────────
-const bootLog  = document.getElementById('boot-log');
-const bootScr  = document.getElementById('boot-screen');
-
-function blogLine(text, color) {
-  const el = document.createElement('div');
-  el.textContent = text;
-  if (color) el.style.color = color;
-  bootLog.appendChild(el);
-}
-
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 async function animateBoot() {
+  const log = document.getElementById('blog');
+  const ln = (text, color) => {
+    const d = document.createElement('div');
+    d.textContent = text;
+    if (color) d.style.color = color;
+    log.appendChild(d);
+  };
+
   const lines = [
-    ['',                                                                 null,    0],
-    ['Ligma-DOS BIOS v6.9  Copyright (C) Ligma Corp. 1985-1994',        '#aaffaa', 80],
-    ['',                                                                 null,    30],
-    ['CPU: Intel 80486DX2 @ 66MHz',                                     '#33ff33', 120],
-    ['RAM: Testing 640K Base Memory... OK',                             '#33ff33', 300],
-    ['RAM: Testing 15360K Extended Memory... OK',                       '#33ff33', 500],
-    ['',                                                                 null,    60],
-    ['BIOS Date: 01/01/1994',                                           '#1aaa1a', 80],
-    ['',                                                                 null,    40],
-    ['Loading HIMEM.SYS...',                                            '#1aaa1a', 200],
-    ['HIMEM is testing extended memory...done.',                        '#1aaa1a', 400],
-    ['',                                                                 null,    40],
-    ['DEVICEHIGH=C:\\DOS\\LIGMA.SYS /D:MSCD001',                        '#1aaa1a', 150],
-    ['DEVICEHIGH=C:\\DOS\\ANSI.SYS',                                    '#1aaa1a', 100],
-    ['',                                                                 null,    60],
-    ['Starting Ligma-DOS...',                                           '#ffff55', 300],
-    ['',                                                                 null,    100],
-    ['Ligma-DOS Version 6.9.0',                                         '#aaffaa', 150],
-    ['Copyright (C) Ligma Corp. 1985-1994. All rights reserved.',       '#aaffaa', 100],
-    ['',                                                                 null,    40],
-    ['C:\\DOS\\AUTOEXEC.BAT',                                            '#1aaa1a', 200],
-    ['SET COMSPEC=C:\\DOS\\COMMAND.COM',                                 '#1aaa1a', 80],
-    ['SET PATH=C:\\DOS;C:\\GAMES',                                       '#1aaa1a', 80],
-    ['SET PROMPT=$P$G',                                                  '#1aaa1a', 80],
-    ['SET TEMP=C:\\TEMP',                                                '#1aaa1a', 80],
-    ['',                                                                 null,    200],
+    ['',                                                                null,      0  ],
+    ['Ligma-DOS BIOS v6.9  Copyright (C) Ligma Corp. 1985-1994',       '#aaffaa', 60 ],
+    ['',                                                                null,      20 ],
+    ['CPU  : Intel 80486DX2 @ 66 MHz',                                 '#33ff33', 100],
+    ['RAM  : Testing 640K Base Memory ... OK',                          '#33ff33', 260],
+    ['RAM  : Testing 15360K Extended Memory ... OK',                    '#33ff33', 440],
+    ['',                                                                null,      40 ],
+    ['HIMEM is testing extended memory...',                             '#1c991c', 180],
+    ['HIMEM is testing extended memory...done.',                        '#1c991c', 360],
+    ['',                                                                null,      30 ],
+    ['DEVICEHIGH=C:\\DOS\\LIGMA.SYS',                                   '#1c991c', 110],
+    ['DEVICEHIGH=C:\\DOS\\ANSI.SYS',                                    '#1c991c', 80 ],
+    ['',                                                                null,      40 ],
+    ['Starting Ligma-DOS...',                                           '#ffff55', 260],
+    ['',                                                                null,      70 ],
+    ['Ligma-DOS  Version 6.9',                                          '#aaffaa', 110],
+    ['Copyright (C) Ligma Corp. 1985-1994. All rights reserved.',       '#aaffaa', 80 ],
+    ['',                                                                null,      30 ],
+    ['SET PATH=C:\\DOS;C:\\GAMES',                                       '#1c991c', 60 ],
+    ['SET PROMPT=$P$G',                                                 '#1c991c', 60 ],
+    ['',                                                                null,      160],
   ];
 
-  for (const [text, color, delay] of lines) {
-    await sleep(delay);
-    blogLine(text, color);
-    bootLog.scrollTop = bootLog.scrollHeight;
+  for (const [t, c, d] of lines) {
+    await sleep(d);
+    ln(t, c);
   }
 }
 
-// ── Build a bare .jsdos bundle in-memory using JSZip ─────────────────────────
-// A .jsdos file is just a ZIP containing:
-//   .jsdos/dosbox.conf   — the DOSBox config
-//   .jsdos/jsdos.json    — js-dos metadata
-//   (game files go here too, but for a bare prompt we just need config)
-async function buildBareBundleBlob() {
+async function buildBundle() {
   const zip = new JSZip();
 
-  // Minimal dosbox.conf — drops straight to C:\ prompt
-  // fullscreen=false so js-dos controls rendering
-  const dosboxConf = `
-[sdl]
-fullscreen=false
-fulldouble=false
-fullresolution=original
-windowresolution=original
-output=surface
-autolock=true
-sensitivity=100
-waitonerror=true
-priority=higher,normal
-mapperfile=mapper-0.74.map
-usescancodes=true
+  // Minimal dosbox.conf — boots to C:\ prompt
+  const conf = [
+    '[sdl]',
+    'fullscreen=false',
+    'output=surface',
+    'autolock=false',
+    '',
+    '[dosbox]',
+    'machine=svga_s3',
+    'memsize=16',
+    '',
+    '[render]',
+    'frameskip=0',
+    'aspect=true',
+    'scaler=none',
+    '',
+    '[cpu]',
+    'core=auto',
+    'cputype=auto',
+    'cycles=auto',
+    '',
+    '[mixer]',
+    'nosound=false',
+    'rate=22050',
+    '',
+    '[sblaster]',
+    'sbtype=sb16',
+    'sbbase=220',
+    'irq=7',
+    'dma=1',
+    '',
+    '[dos]',
+    'xms=true',
+    'ems=true',
+    'umb=true',
+    '',
+    '[autoexec]',
+    '@echo off',
+    'cls',
+    'echo.',
+    'echo  ================================',
+    'echo   L I G M A - D O S   v6.9',
+    'echo  ================================',
+    'echo.',
+    'echo  Games are in C:\\GAMES',
+    'echo  Type HELP for commands.',
+    'echo.',
+  ].join('\n');
 
-[dosbox]
-language=
-machine=svga_s3
-captures=capture
-memsize=16
-
-[render]
-frameskip=0
-aspect=false
-scaler=none
-
-[cpu]
-core=auto
-cputype=auto
-cycles=auto
-cycleup=10
-cycledown=20
-
-[mixer]
-nosound=false
-rate=22050
-blocksize=1024
-prebuffer=20
-
-[midi]
-
-[sblaster]
-sbtype=sb16
-sbbase=220
-irq=7
-dma=1
-hdma=5
-sbmixer=true
-oplmode=auto
-oplemu=default
-oplrate=22050
-
-[gus]
-gus=false
-
-[speaker]
-pcspeaker=true
-pcrate=22050
-tandy=auto
-tandyrate=22050
-disney=false
-
-[joystick]
-joysticktype=auto
-timed=true
-autofire=false
-swap34=false
-buttonwrap=false
-
-[serial]
-serial1=dummy
-serial2=dummy
-serial3=disabled
-serial4=disabled
-
-[dos]
-xms=true
-ems=true
-umb=true
-keyboardlayout=auto
-
-[ipx]
-ipx=false
-
-[autoexec]
-@echo off
-cls
-echo.
-echo  L I G M A - D O S   Version 6.9 
-echo  ================================
-echo.
-echo  Games are in C:\\GAMES
-echo  Type: CD GAMES   then   DIR
-echo  Run a game with its filename (e.g. DOOM.EXE)
-echo.
-`;
-
-  // jsdos.json — required by js-dos v8
-  const jsdosJson = JSON.stringify({
-    version: "8.xx",
-    build: "dosbox",
+  zip.file('.jsdos/dosbox.conf', conf);
+  zip.file('.jsdos/jsdos.json', JSON.stringify({
+    version: '8.xx',
+    build: 'dosbox',
     options: {}
-  });
+  }));
 
-  zip.folder('.jsdos');
-  zip.file('.jsdos/dosbox.conf', dosboxConf);
-  zip.file('.jsdos/jsdos.json', jsdosJson);
-
-  const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
-  return blob;
+  return zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
 }
 
-// ── Main: animate boot then launch DOSBox ─────────────────────────────────────
 async function main() {
-  // Run boot animation and bundle build in parallel
-  const [, bundleBlob] = await Promise.all([
-    animateBoot(),
-    buildBareBundleBlob(),
-  ]);
+  // Run boot animation + bundle build in parallel
+  const [, bundle] = await Promise.all([animateBoot(), buildBundle()]);
 
-  // Hide boot screen, reveal DOSBox
-  bootScr.classList.add('hidden');
+  // Hide boot screen
+  document.getElementById('boot').classList.add('gone');
 
-  const url = URL.createObjectURL(bundleBlob);
+  const url = URL.createObjectURL(bundle);
 
   try {
-    await Dos(document.getElementById('dos-root'), {
-      url,
-      theme: 'dark',
-      renderBackend: 'webgl',
-      renderAspect: '4/3',
-      onEvent(event) {
-        // Once emulator is ready, revoke the object URL to free memory
-        if (event === 'emu-ready' || event === 'ci-ready') {
-          setTimeout(() => URL.revokeObjectURL(url), 5000);
-        }
-      }
-    });
-  } catch (err) {
-    document.getElementById('err-msg').textContent = err.message;
-    document.getElementById('error-screen').classList.add('show');
+    // Use EXACT pattern from official docs — no extra options that might break rendering
+    Dos(document.getElementById('dos'), { url });
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+  } catch(e) {
+    document.getElementById('errmsg').textContent = e.message;
+    document.getElementById('err').classList.add('show');
   }
 }
 
